@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "docker-secret-validation-webhook.fullname" . }}
+  labels:
+    {{- include "docker-secret-validation-webhook.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "docker-secret-validation-webhook.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/webhook_bundle.yaml") . | sha256sum }}
+    {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      labels:
+        {{- include "docker-secret-validation-webhook.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --log-level={{ .Values.logLevel | default "info" }}
+          ports:
+            - name: https
+              containerPort: 8443
+              protocol: TCP
+            - name: healthz
+              containerPort: 8001
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              scheme: HTTP
+              path: /healthz
+              port: healthz
+          readinessProbe:
+            httpGet:
+              scheme: HTTP
+              path: /healthz
+              port: healthz
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: docker-secret-validation-webhook-certs
+              mountPath: /tls
+              readOnly: true
+      volumes:
+        - name: docker-secret-validation-webhook-certs
+          secret:
+            secretName: {{ include "docker-secret-validation-webhook.fullname" . }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

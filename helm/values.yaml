@@ -1,0 +1,43 @@
+logLevel: info
+
+image:
+  repository: fl64/docker-secret-validation-webhook
+  pullPolicy: Always
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "latest"
+
+nameOverride: ""
+fullnameOverride: ""
+
+podAnnotations: {}
+
+service:
+  type: ClusterIP
+  port: 443
+
+webhook:
+  failurePolicy: Fail
+  namespaceSelector:
+    matchExpressions:
+      - key: "kubernetes.io/metadata.name"
+        operator: "In"
+        values:
+          - "default"
+  objectSelector:
+    matchLabels:
+      test: test
+
+
+resources: {}
+#  limits:
+#    cpu: 20m
+#    memory: 64Mi
+#  requests:
+#    cpu: 20m
+#    memory: 64Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

@@ -1,0 +1,47 @@
+{{- $ca := genCA "docker-secret-validation-webhook CA" 365 }}
+{{- $CN := (include "docker-secret-validation-webhook.serviceFQDN" .) }}
+{{- $cert := genSignedCert $CN (list "127.0.0.1") (list "localhost" $CN) 365 $ca }}
+
+apiVersion: v1
+data:
+  tls.crt: {{ $cert.Cert | b64enc | quote }}
+  tls.key: {{ $cert.Key | b64enc | quote }}
+kind: Secret
+metadata:
+  creationTimestamp: null
+  name: {{ include "docker-secret-validation-webhook.fullname" . }}
+  labels:
+    {{- include "docker-secret-validation-webhook.labels" . | nindent 4 }}
+type: kubernetes.io/tls
+
+---
+
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: {{ include "docker-secret-validation-webhook.fullname" . }}
+webhooks:
+  - name: {{ include "docker-secret-validation-webhook.serviceFQDN" . }}
+    clientConfig:
+      service:
+        name: {{ include "docker-secret-validation-webhook.fullname" . }}
+        namespace: {{ .Release.Namespace | default "default" }}
+        path: "/validate"
+      caBundle: {{ $ca.Cert | b64enc | quote }}
+    rules:
+      - operations: [ "CREATE", "UPDATE" ]
+        apiGroups: [""]
+        apiVersions: ["v1"]
+        resources: ["secrets"]
+    namespaceSelector:
+      {{- with .Values.webhook.namespaceSelector }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+    objectSelector:
+      {{- with .Values.webhook.objectSelector }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+    failurePolicy: {{ .Values.webhook.failurePolicy }}
+    #timeoutSeconds: 2
+    sideEffects: None
+    admissionReviewVersions: ["v1"]
