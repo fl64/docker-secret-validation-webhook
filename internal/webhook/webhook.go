@@ -2,19 +2,20 @@ package webhook
 
 import (
 	"context"
-	"docker-secret-validation-webhook/internal/registryclient"
 	"encoding/json"
 	"fmt"
-	"github.com/google/go-containerregistry/pkg/authn"
-	"github.com/gorilla/mux"
-	"github.com/sirupsen/logrus"
 	"io"
-	v12 "k8s.io/api/admission/v1"
-	"k8s.io/api/core/v1"
-	v13 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net/http"
 	"os"
 	"time"
+
+	"docker-secret-validation-webhook/internal/registryclient"
+	"github.com/google/go-containerregistry/pkg/authn"
+	"github.com/gorilla/mux"
+	"github.com/sirupsen/logrus"
+	v12 "k8s.io/api/admission/v1"
+	v1 "k8s.io/api/core/v1"
+	v13 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type DockerConfig struct {
@@ -27,10 +28,10 @@ type ValidatingWebhook struct {
 	tlsKeyFile     string
 	imageToCheck   string
 	srv            *http.Server
-	registryClient registryclient.RegistryClientInterface
+	registryClient registryclient.RCInterface
 }
 
-func NewValidatingWebhook(addr, imageToCheck, tlsCertFile, tlsKeyFile string, registryClient registryclient.RegistryClientInterface) *ValidatingWebhook {
+func NewValidatingWebhook(addr, imageToCheck, tlsCertFile, tlsKeyFile string, registryClient registryclient.RCInterface) *ValidatingWebhook {
 	return &ValidatingWebhook{
 		tlsCertFile:    tlsCertFile,
 		tlsKeyFile:     tlsKeyFile,
@@ -80,6 +81,7 @@ func (vw *ValidatingWebhook) Run(ctx context.Context) error {
 		return err
 	}
 	logrus.Info("app stopped")
+
 	return nil
 }
 
@@ -98,7 +100,7 @@ func (vw *ValidatingWebhook) validateSecret(secret *v1.Secret) error {
 	dockerCfg := &DockerConfig{}
 	err := json.Unmarshal(dockerCfgRaw, dockerCfg)
 	if err != nil {
-		return fmt.Errorf("сan't umarshal docker config: %v", err)
+		return fmt.Errorf("сan't umarshal docker config: %w", err)
 	}
 
 	if len(dockerCfg.Auths) == 0 {
@@ -135,23 +137,26 @@ func (vw *ValidatingWebhook) ValidatingWebhook(w http.ResponseWriter, r *http.Re
 	if err != nil {
 		logrus.Errorf("can't unmarshal admission review: %v", err)
 		http.Error(w, "can't unmarshal admission review", http.StatusBadRequest)
+
 		return
 	}
 
 	if review.Request == nil {
 		logrus.Errorf("bad admission review")
 		http.Error(w, "bad admission review", http.StatusBadRequest)
+
 		return
 	}
 
 	// Decode secret
-	secretJson := review.Request.Object.Raw
+	secretJSON := review.Request.Object.Raw
 
 	secret := &v1.Secret{}
-	err = json.Unmarshal(secretJson, secret)
+	err = json.Unmarshal(secretJSON, secret)
 	if err != nil {
 		logrus.Errorf("can't unmarshal secret: %v", err)
 		http.Error(w, "can't unmarshal secret", http.StatusBadRequest)
+
 		return
 	}
 
@@ -178,6 +183,7 @@ func (vw *ValidatingWebhook) ValidatingWebhook(w http.ResponseWriter, r *http.Re
 	if err != nil {
 		logrus.Errorf("failed to marshal review: %v", err)
 		http.Error(w, "failed to marshal review", http.StatusInternalServerError)
+
 		return
 	}
 	_, _ = w.Write(reviewBytes)

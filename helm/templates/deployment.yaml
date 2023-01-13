@@ -23,6 +23,8 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
+            - --webhook-addr=:8443
+            - --health-addr=:8001
             - --log-level={{ .Values.logLevel | default "info" }}
           ports:
             - name: https

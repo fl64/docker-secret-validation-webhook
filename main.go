@@ -2,15 +2,16 @@ package main
 
 import (
 	"context"
-	"docker-secret-validation-webhook/internal/registryclient"
-	"docker-secret-validation-webhook/internal/webhook"
 	"flag"
-	"github.com/gorilla/mux"
-	log "github.com/sirupsen/logrus"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"docker-secret-validation-webhook/internal/registryclient"
+	"docker-secret-validation-webhook/internal/webhook"
+	"github.com/gorilla/mux"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -22,8 +23,10 @@ var (
 	logLevelStr  = flag.String("log-level", "info", "Log level")
 )
 
-var BuildDatetime = "none"
-var AppName = "docker-secret-validating-webhook"
+var (
+	BuildDatetime = "none"
+	AppName       = "docker-secret-validating-webhook"
+)
 
 func main() {
 	ctx := context.Background()
@@ -68,10 +71,9 @@ func main() {
 
 	registryClient := registryclient.NewRegistryClient()
 	// run webnhook
-	webhook := webhook.NewValidatingWebhook(*webhookAddr, *imageToCheck, *tlsCertFile, *tlsKeyFile, registryClient)
-	err = webhook.Run(ctx)
+	wh := webhook.NewValidatingWebhook(*webhookAddr, *imageToCheck, *tlsCertFile, *tlsKeyFile, registryClient)
+	err = wh.Run(ctx)
 	if err != nil {
-		log.Fatalf("error serving webhook: %v", err)
+		log.Errorf("error serving webhook: %v", err)
 	}
-
 }

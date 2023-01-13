@@ -6,28 +6,29 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/google/go-containerregistry/pkg/authn"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/ginkgo/extensions/table"
-	. "github.com/onsi/gomega"
 	"io"
-	admissionv1 "k8s.io/api/admission/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"text/template"
 	"time"
+
+	"github.com/google/go-containerregistry/pkg/authn"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/extensions/table"
+	. "github.com/onsi/gomega"
+	admissionv1 "k8s.io/api/admission/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
-type FakeRegistryClient struct {
-}
+type FakeRegistryClient struct{}
 
 func (r FakeRegistryClient) CheckImage(registry, image string, authCfg authn.AuthConfig) error {
 	if authCfg.Username != "valid" {
 		return fmt.Errorf("Auth failed")
 	}
+
 	return nil
 }
 
@@ -36,9 +37,7 @@ func TestWebhook(t *testing.T) {
 	RunSpecs(t, "Webhook")
 }
 
-const webhookAddrTest = ""
-
-const admisstionReviewJsonTemplate = `
+const admisstionReviewJSONTemplate = `
 {
   "kind": "AdmissionReview",
   "apiVersion": "admission.k8s.io/v1",
@@ -70,20 +69,20 @@ const admisstionReviewJsonTemplate = `
 
 type templateParams struct {
 	SecretType       string
-	DockerConfigJson string
+	DockerConfigJSON string
 	DockerConfigB64  string
 }
 
-func AdmisstionJson(params templateParams) string {
+func AdmisstionJSON(params templateParams) string {
 	var output bytes.Buffer
 	if params.SecretType == "" {
 		params.SecretType = "kubernetes.io/dockerconfigjson"
 	}
 	if params.DockerConfigB64 == "" {
-		params.DockerConfigB64 = base64.StdEncoding.EncodeToString([]byte(params.DockerConfigJson))
+		params.DockerConfigB64 = base64.StdEncoding.EncodeToString([]byte(params.DockerConfigJSON))
 	}
 
-	t := template.Must(template.New("").Parse(admisstionReviewJsonTemplate))
+	t := template.Must(template.New("").Parse(admisstionReviewJSONTemplate))
 	_ = t.Execute(&output, params)
 
 	return output.String()
@@ -111,7 +110,7 @@ var _ = Describe("ValidatingWebhook", func() {
 		vw := NewValidatingWebhook(":36363", "test-image", "", "", r)
 		DescribeTable("",
 			func(admissionReview string, want *wanted) {
-				r := httptest.NewRequest("POST", "/validate", strings.NewReader(admissionReview))
+				r := httptest.NewRequest(http.MethodPost, "/validate", strings.NewReader(admissionReview))
 				w := httptest.NewRecorder()
 				vw.ValidatingWebhook(w, r)
 				resp := w.Result()
@@ -126,7 +125,6 @@ var _ = Describe("ValidatingWebhook", func() {
 					Expect(review.Response.UID).To(Equal(types.UID("12345678-1234-1234-1234-123456789012")))
 					Expect(review.Response.Allowed).To(Equal(want.AdmissionAllowed))
 				}
-
 			},
 			Entry("Invalid admission review",
 				"{}",
@@ -135,8 +133,8 @@ var _ = Describe("ValidatingWebhook", func() {
 					StatusCode:    http.StatusBadRequest,
 				}),
 			Entry("Secret with wrong type",
-				AdmisstionJson(templateParams{
-					DockerConfigJson: "",
+				AdmisstionJSON(templateParams{
+					DockerConfigJSON: "",
 					SecretType:       "Opaque",
 				}),
 				&wanted{
@@ -145,8 +143,8 @@ var _ = Describe("ValidatingWebhook", func() {
 					StatusCode:       http.StatusOK,
 				}),
 			Entry("Field .dockerconfigjson is missed in the secret",
-				AdmisstionJson(templateParams{
-					DockerConfigJson: "",
+				AdmisstionJSON(templateParams{
+					DockerConfigJSON: "",
 				}),
 				&wanted{
 					AdmissionAllowed: false,
@@ -154,8 +152,8 @@ var _ = Describe("ValidatingWebhook", func() {
 					StatusCode:       http.StatusOK,
 				}),
 			Entry("Bad .dockerconfigjson data",
-				AdmisstionJson(templateParams{
-					DockerConfigJson: `{"aaa": "bbb"}`, // {"aaa":"bbb"}
+				AdmisstionJSON(templateParams{
+					DockerConfigJSON: `{"aaa": "bbb"}`, // {"aaa":"bbb"}
 				}),
 				&wanted{
 					AdmissionAllowed: false,
@@ -163,8 +161,8 @@ var _ = Describe("ValidatingWebhook", func() {
 					StatusCode:       http.StatusOK,
 				}),
 			Entry("Empty auths",
-				AdmisstionJson(templateParams{
-					DockerConfigJson: `{ "auths": { } }`,
+				AdmisstionJSON(templateParams{
+					DockerConfigJSON: `{ "auths": { } }`,
 				}),
 				&wanted{
 					AdmissionAllowed: false,
@@ -172,8 +170,8 @@ var _ = Describe("ValidatingWebhook", func() {
 					StatusCode:       http.StatusOK,
 				}),
 			Entry("Valid Secret with invalid creds",
-				AdmisstionJson(templateParams{
-					DockerConfigJson: `{ "auths": { "registry.example.com": { "auth": "aW52YWxpZDppbnZhbGlkCg==" } } }`, // invalid:invalid
+				AdmisstionJSON(templateParams{
+					DockerConfigJSON: `{ "auths": { "registry.example.com": { "auth": "aW52YWxpZDppbnZhbGlkCg==" } } }`, // invalid:invalid
 				}),
 				&wanted{
 					AdmissionAllowed: false,
@@ -181,8 +179,8 @@ var _ = Describe("ValidatingWebhook", func() {
 					StatusCode:       http.StatusOK,
 				}),
 			Entry("Valid Secret with working creds",
-				AdmisstionJson(templateParams{
-					DockerConfigJson: `{ "auths": { "registry.example.com": { "auth": "dmFsaWQ6dmFsaWQK" } } }`, // valid:valid
+				AdmisstionJSON(templateParams{
+					DockerConfigJSON: `{ "auths": { "registry.example.com": { "auth": "dmFsaWQ6dmFsaWQK" } } }`, // valid:valid
 				}),
 				&wanted{
 					AdmissionAllowed: true,
@@ -191,5 +189,4 @@ var _ = Describe("ValidatingWebhook", func() {
 				}),
 		)
 	})
-
 })

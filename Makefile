@@ -33,11 +33,10 @@ push_latest: push latest
 lint_hadolint:
 	docker run --rm -v "${PWD}":/app:ro -w /app hadolint/hadolint:$(HADOLINT_VER) hadolint /app/Dockerfile
 
-lint_golangci:
-	docker run --rm -v $(PWD):/app:ro -w /app golangci/golangci-lint:$(GOLANGLINT_VER) golangci-lint run -v --timeout=360s
+lint_golangci: # -u $(shell id -u)
+	docker run  --rm -v $(PWD):/app:ro -w /app golangci/golangci-lint:$(GOLANGLINT_VER) golangci-lint run -v --timeout=360s
 
 lint: lint-hadolint lint-golangci
-
 
 helm_install:
 	helm upgrade --install docker-secret-validation-webhook -n $(NS) ./helm --create-namespace
