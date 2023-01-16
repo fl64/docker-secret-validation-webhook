@@ -2,14 +2,14 @@ package main
 
 import (
 	"context"
+	"docker-secret-validation-webhook/internal/registryclient"
+	"docker-secret-validation-webhook/internal/webhook"
 	"flag"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"docker-secret-validation-webhook/internal/registryclient"
-	"docker-secret-validation-webhook/internal/webhook"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 )
