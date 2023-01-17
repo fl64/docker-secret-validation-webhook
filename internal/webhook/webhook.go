@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/go-containerregistry/pkg/authn"
@@ -44,12 +45,12 @@ type ValidatingWebhook struct {
 	addr           string
 	tlsCertFile    string
 	tlsKeyFile     string
-	tagToCheck     string
+	tagToCheck     *atomic.Value
 	srv            *http.Server
 	registryClient registryclient.RCInterface
 }
 
-func NewValidatingWebhook(addr, tagToCheck, tlsCertFile, tlsKeyFile string, registryClient registryclient.RCInterface) *ValidatingWebhook {
+func NewValidatingWebhook(addr, tlsCertFile, tlsKeyFile string, registryClient registryclient.RCInterface, tagToCheck *atomic.Value) *ValidatingWebhook {
 	return &ValidatingWebhook{
 		tlsCertFile:    tlsCertFile,
 		tlsKeyFile:     tlsKeyFile,
@@ -158,7 +159,7 @@ func (vw *ValidatingWebhook) validateSecret(secret *core.Secret) error {
 
 	// check registries in docker config
 	for registry, authCfg := range dockerCfg.Auths {
-		image := fmt.Sprintf("%s:%s", path, vw.tagToCheck)
+		image := fmt.Sprintf("%s:%s", path, vw.tagToCheck.Load())
 		err = vw.registryClient.CheckImage(registry, image, authCfg)
 		if err != nil {
 			return err
