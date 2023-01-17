@@ -128,13 +128,19 @@ func (vw *ValidatingWebhook) validateSecret(secret *core.Secret) error {
 	// Secret must contain ".dockerconfigjson" field
 	dockerCfgRaw, ok := secret.Data[core.DockerConfigJsonKey]
 	if !ok {
-		return fmt.Errorf("secret should contain %s field", core.DockerConfigJsonKey)
+		return fmt.Errorf("secret must contain the '%s' field and it must be non-empty", core.DockerConfigJsonKey)
 	}
 
 	// Check URI (scheme + address + path)
 	scheme := string(secret.Data["scheme"])
 	address := string(secret.Data["address"])
+	if address == "" {
+		return fmt.Errorf("secret must contain the 'address' field and it must be non-empty")
+	}
 	path := string(secret.Data["path"])
+	if path == "" {
+		return fmt.Errorf("secret must contain the 'path' field and it must be non-empty")
+	}
 	err := vw.checkURI(scheme, address, path)
 	if err != nil {
 		return err
@@ -143,7 +149,7 @@ func (vw *ValidatingWebhook) validateSecret(secret *core.Secret) error {
 	dockerCfg := &DockerConfig{}
 	err = json.Unmarshal(dockerCfgRaw, dockerCfg)
 	if err != nil {
-		return fmt.Errorf("сan't umarshal docker config: %w", err)
+		return fmt.Errorf("can't umarshal docker config: %w", err)
 	}
 
 	if len(dockerCfg.Auths) == 0 {
