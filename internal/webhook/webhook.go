@@ -44,16 +44,16 @@ type ValidatingWebhook struct {
 	addr           string
 	tlsCertFile    string
 	tlsKeyFile     string
-	imageToCheck   string
+	tagToCheck     string
 	srv            *http.Server
 	registryClient registryclient.RCInterface
 }
 
-func NewValidatingWebhook(addr, imageToCheck, tlsCertFile, tlsKeyFile string, registryClient registryclient.RCInterface) *ValidatingWebhook {
+func NewValidatingWebhook(addr, tagToCheck, tlsCertFile, tlsKeyFile string, registryClient registryclient.RCInterface) *ValidatingWebhook {
 	return &ValidatingWebhook{
 		tlsCertFile:    tlsCertFile,
 		tlsKeyFile:     tlsKeyFile,
-		imageToCheck:   imageToCheck,
+		tagToCheck:     tagToCheck,
 		addr:           addr,
 		registryClient: registryClient,
 	}
@@ -152,7 +152,8 @@ func (vw *ValidatingWebhook) validateSecret(secret *core.Secret) error {
 
 	// check registries in docker config
 	for registry, authCfg := range dockerCfg.Auths {
-		err = vw.registryClient.CheckImage(registry, vw.imageToCheck, authCfg)
+		image := fmt.Sprintf("%s:%s", path, vw.tagToCheck)
+		err = vw.registryClient.CheckImage(registry, image, authCfg)
 		if err != nil {
 			return err
 		}
